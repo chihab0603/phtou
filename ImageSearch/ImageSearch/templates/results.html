@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نتائج البحث - {{ query }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-body-tertiary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-search text-info"></i>
+                البحث عن الصور
+            </a>
+            <div class="navbar-nav me-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">
+                    <i class="fas fa-plus ms-1"></i>
+                    بحث جديد
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="mb-0">
+                        <i class="fas fa-images text-info ms-2"></i>
+                        نتائج البحث عن "{{ query }}"
+                    </h2>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-info" onclick="refreshImages()">
+                            <i class="fas fa-sync-alt ms-1"></i>
+                            تحديث
+                        </button>
+                        <button type="button" class="btn btn-outline-success" onclick="selectAllImages()">
+                            <i class="fas fa-check-square ms-1"></i>
+                            تحديد الكل
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" onclick="clearSelection()">
+                            <i class="fas fa-times ms-1"></i>
+                            إلغاء التحديد
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="text-muted mb-0">تم العثور على <span id="image-count">{{ images|length }}</span> صورة</p>
+                    <div class="selected-info">
+                        <span class="badge bg-info" id="selected-count">لم يتم تحديد أي صورة</span>
+                    </div>
+                </div>
+
+                <!-- Download controls -->
+                <div class="card mb-4" id="download-controls" style="display: none;">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-download ms-2"></i>
+                            خيارات التحميل
+                        </h5>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100" onclick="downloadAsZip()">
+                                    <i class="fas fa-file-archive ms-2"></i>
+                                    تحميل ZIP
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="dropdown">
+                                    <button class="btn btn-danger dropdown-toggle w-100" type="button" id="pdfDropdown" data-bs-toggle="dropdown">
+                                        <i class="fas fa-file-pdf ms-2"></i>
+                                        تحميل PDF
+                                    </button>
+                                    <ul class="dropdown-menu w-100">
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('1')">
+                                            <i class="fas fa-file ms-2"></i>صورة واحدة لكل صفحة
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('2')">
+                                            <i class="fas fa-grip-horizontal ms-2"></i>صورتان لكل صفحة
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('4')">
+                                            <i class="fas fa-th ms-2"></i>4 صور لكل صفحة
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('6')">
+                                            <i class="fas fa-th-large ms-2"></i>6 صور لكل صفحة
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('8')">
+                                            <i class="fas fa-th ms-2"></i>8 صور لكل صفحة
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="dropdown">
+                                    <button class="btn btn-warning dropdown-toggle w-100" type="button" id="stretchPdfDropdown" data-bs-toggle="dropdown">
+                                        <i class="fas fa-expand-arrows-alt ms-2"></i>
+                                        PDF ممدد
+                                    </button>
+                                    <ul class="dropdown-menu w-100">
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('1', true)">
+                                            <i class="fas fa-expand ms-2"></i>صورة واحدة ممددة
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('2', true)">
+                                            <i class="fas fa-expand ms-2"></i>صورتان ممددتان
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="downloadAsPdf('4', true)">
+                                            <i class="fas fa-expand ms-2"></i>4 صور ممددة
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image grid -->
+        <div class="row g-3" id="image-grid">
+            {% for image in images %}
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="card h-100 image-card" data-image-url="{{ image.image }}" data-thumbnail-url="{{ image.thumbnail }}">
+                        <div class="card-img-wrapper">
+                            <!-- Selection checkbox -->
+                            <div class="image-select-overlay">
+                                <div class="form-check">
+                                    <input class="form-check-input image-checkbox" type="checkbox" 
+                                           id="img-{{ loop.index }}" value="{{ image.image }}"
+                                           onchange="updateSelection()">
+                                    <label class="form-check-label" for="img-{{ loop.index }}"></label>
+                                </div>
+                            </div>
+                            
+                            <img 
+                                src="{{ image.thumbnail }}" 
+                                class="card-img-top"
+                                alt="{{ image.title or 'Image' }}"
+                                loading="lazy"
+                                onerror="this.parentElement.parentElement.style.display='none'"
+                            >
+                            <div class="card-img-overlay p-0">
+                                <div class="image-overlay">
+                                    <div class="btn-group">
+                                        <a 
+                                            href="{{ image.image }}" 
+                                            target="_blank" 
+                                            class="btn btn-info btn-sm"
+                                            title="عرض الصورة كاملة"
+                                        >
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                        <a 
+                                            href="{{ url_for('download_single_image', image_url=image.image) }}"
+                                            class="btn btn-success btn-sm"
+                                            title="تحميل الصورة"
+                                        >
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% if image.title %}
+                            <div class="card-body p-2">
+                                <small class="text-muted text-truncate d-block" title="{{ image.title }}">
+                                    {{ image.title }}
+                                </small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Load more and back to search -->
+        <div class="row mt-5">
+            <div class="col-12 text-center">
+                <button class="btn btn-primary me-3" onclick="loadMoreImages()">
+                    <i class="fas fa-plus ms-2"></i>
+                    تحميل المزيد
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-info">
+                    <i class="fas fa-arrow-right ms-2"></i>
+                    العودة للبحث
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentQuery = "{{ query }}";
+        let selectedImages = new Set();
+
+        // Update selection count and download controls visibility
+        function updateSelection() {
+            const checkboxes = document.querySelectorAll('.image-checkbox:checked');
+            const count = checkboxes.length;
+            selectedImages.clear();
+            
+            checkboxes.forEach(cb => selectedImages.add(cb.value));
+            
+            document.getElementById('selected-count').textContent = count === 0 ? 'لم يتم تحديد أي صورة' : 'تم تحديد ' + count + ' صورة';
+            
+            const downloadControls = document.getElementById('download-controls');
+            if (count > 0) {
+                downloadControls.style.display = 'block';
+            } else {
+                downloadControls.style.display = 'none';
+            }
+        }
+
+        // Select all images
+        function selectAllImages() {
+            const checkboxes = document.querySelectorAll('.image-checkbox');
+            checkboxes.forEach(cb => cb.checked = true);
+            updateSelection();
+        }
+
+        // Clear selection
+        function clearSelection() {
+            const checkboxes = document.querySelectorAll('.image-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+            updateSelection();
+        }
+
+        // Refresh images
+        async function refreshImages() {
+            const refreshBtn = document.querySelector('button[onclick="refreshImages()"]');
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm ms-1"></span>جاري التحديث...';
+            refreshBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('query', currentQuery);
+                
+                const response = await fetch('/refresh_search', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    updateImageGrid(data.images);
+                    document.getElementById('image-count').textContent = data.images.length;
+                    clearSelection();
+                } else {
+                    const error = await response.json();
+                    alert('خطأ في تحديث الصور: ' + (error.error || 'خطأ غير معروف'));
+                }
+            } catch (error) {
+                console.error('Error refreshing images:', error);
+                alert('خطأ في تحديث الصور. يرجى المحاولة مرة أخرى.');
+            } finally {
+                refreshBtn.innerHTML = originalText;
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Update image grid with new images
+        function updateImageGrid(images) {
+            const grid = document.getElementById('image-grid');
+            grid.innerHTML = '';
+
+            images.forEach((image, index) => {
+                addImageToGrid(image, index + 1);
+            });
+        }
+
+        // Add new images to existing grid
+        function addImagesToGrid(images, startIndex = 0) {
+            images.forEach((image, index) => {
+                addImageToGrid(image, startIndex + index + 1);
+            });
+        }
+
+        // Add single image to grid
+        function addImageToGrid(image, index) {
+            const grid = document.getElementById('image-grid');
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-4 col-lg-3';
+            
+            col.innerHTML = `
+                <div class="card h-100 image-card" data-image-url="${image.image}" data-thumbnail-url="${image.thumbnail}">
+                    <div class="card-img-wrapper">
+                        <div class="image-select-overlay">
+                            <div class="form-check">
+                                <input class="form-check-input image-checkbox" type="checkbox" 
+                                       id="img-${index}" value="${image.image}"
+                                       onchange="updateSelection()">
+                                <label class="form-check-label" for="img-${index}"></label>
+                            </div>
+                        </div>
+                        
+                        <img 
+                            src="${image.thumbnail}" 
+                            class="card-img-top"
+                            alt="${image.title || 'Image'}"
+                            loading="lazy"
+                            onerror="this.parentElement.parentElement.style.display='none'"
+                        >
+                        <div class="card-img-overlay p-0">
+                            <div class="image-overlay">
+                                <div class="btn-group">
+                                    <a 
+                                        href="${image.image}" 
+                                        target="_blank" 
+                                        class="btn btn-info btn-sm"
+                                        title="عرض الصورة كاملة"
+                                    >
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                    <a 
+                                        href="/download_single/${encodeURIComponent(image.image)}"
+                                        class="btn btn-success btn-sm"
+                                        title="تحميل الصورة"
+                                    >
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${image.title ? `
+                        <div class="card-body p-2">
+                            <small class="text-muted text-truncate d-block" title="${image.title}">
+                                ${image.title}
+                            </small>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            grid.appendChild(col);
+        }
+
+        // Download as ZIP
+        async function downloadAsZip() {
+            if (selectedImages.size === 0) {
+                alert('يرجى تحديد صورة واحدة على الأقل للتحميل.');
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="downloadAsZip()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm ms-2"></span>جاري إنشاء ZIP...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/download_images_zip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image_urls: Array.from(selectedImages),
+                        query: currentQuery
+                    })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${currentQuery}_images.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    const error = await response.json();
+                    alert('خطأ في إنشاء ملف ZIP: ' + (error.error || 'خطأ غير معروف'));
+                }
+            } catch (error) {
+                console.error('Error downloading ZIP:', error);
+                alert('خطأ في تحميل ZIP. يرجى المحاولة مرة أخرى.');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Download as PDF
+        async function downloadAsPdf(layout, stretch = false) {
+            if (selectedImages.size === 0) {
+                alert('يرجى تحديد صورة واحدة على الأقل للتحميل.');
+                return;
+            }
+
+            const btn = stretch ? document.getElementById('stretchPdfDropdown') : document.getElementById('pdfDropdown');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm ms-2"></span>جاري إنشاء PDF...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/download_pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image_urls: Array.from(selectedImages),
+                        layout: layout,
+                        stretch: stretch,
+                        query: currentQuery
+                    })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${currentQuery}_${layout}${stretch ? '_stretched' : ''}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    const error = await response.json();
+                    alert('خطأ في إنشاء PDF: ' + (error.error || 'خطأ غير معروف'));
+                }
+            } catch (error) {
+                console.error('Error downloading PDF:', error);
+                alert('خطأ في تحميل PDF. يرجى المحاولة مرة أخرى.');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Load more images
+        async function loadMoreImages() {
+            const loadMoreBtn = document.querySelector('button[onclick="loadMoreImages()"]');
+            const originalText = loadMoreBtn.innerHTML;
+            loadMoreBtn.innerHTML = '<span class="spinner-border spinner-border-sm ms-2"></span>جاري التحميل...';
+            loadMoreBtn.disabled = true;
+
+            try {
+                const currentImages = document.querySelectorAll('.image-card').length;
+                
+                // Collect current images data to avoid duplicates
+                const currentImagesData = [];
+                document.querySelectorAll('.image-card').forEach(card => {
+                    const imageUrl = card.getAttribute('data-image-url');
+                    if (imageUrl) {
+                        currentImagesData.push({ image: imageUrl });
+                    }
+                });
+                
+                const response = await fetch('/load_more_images', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: currentQuery,
+                        current_count: currentImages,
+                        current_images: currentImagesData
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addImagesToGrid(data.images, currentImages);
+                    
+                    // Update image count
+                    const newTotal = currentImages + data.images.length;
+                    document.getElementById('image-count').textContent = newTotal;
+                    
+                    // Show success message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+                    alertDiv.innerHTML = `
+                        تم إضافة ${data.images.length} صورة جديدة
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.querySelector('.container').insertBefore(alertDiv, document.getElementById('image-grid'));
+                    
+                    // Auto-dismiss alert after 3 seconds
+                    setTimeout(() => {
+                        if (alertDiv.parentNode) {
+                            alertDiv.remove();
+                        }
+                    }, 3000);
+                    
+                } else {
+                    const error = await response.json();
+                    // Show modal for "no more images" message
+                    showNoMoreImagesModal(error.error || 'لم يتوفر أي صور إضافية');
+                }
+            } catch (error) {
+                console.error('Error loading more images:', error);
+                alert('خطأ في تحميل المزيد من الصور. يرجى المحاولة مرة أخرى.');
+            } finally {
+                loadMoreBtn.innerHTML = originalText;
+                loadMoreBtn.disabled = false;
+            }
+        }
+
+        // Show modal for no more images
+        function showNoMoreImagesModal(message) {
+            const modalHtml = `
+                <div class="modal fade" id="noMoreImagesModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-info-circle text-info me-2"></i>
+                                    تنبيه
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                                <p class="mb-0">${message}</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">موافق</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('noMoreImagesModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to page
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('noMoreImagesModal'));
+            modal.show();
+            
+            // Remove modal from DOM after it's hidden
+            document.getElementById('noMoreImagesModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateSelection();
+        });
+    </script>
+</body>
+</html>
